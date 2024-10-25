@@ -39,6 +39,8 @@ app = Flask(__name__)
 block_chain = Block_chain()
 Nodes = {}
 node_name = ''
+messages = {}
+Connections = {}
 
 @app.route('/')
 def index() -> str:  
@@ -71,6 +73,59 @@ def connect(url):
            Nodes[name]['name'] = name
            Nodes[name]['url'] = nodes[name]['url']
            requests.post(nodes[name]['url']+'/nodes', json=Nodes[node_name])
+
+
+@app.post('/connections')
+def post_connections():
+    new_connection = request.json
+    connection_id = new_connection['connection_id']
+    node_url = new_connection['node_url']
+
+    if connection_id not in Connections:
+        Connections[connection_id] = node_url
+        return f"Connection {connection_id} registered with node {node_url}", 201
+    else:
+        return f"Connection {connection_id} already exists.", 400
+
+@app.get('/connections')
+def get_connections():
+    return Connections
+
+
+@app.route('/connection/<connection_id>/message', methods=['POST'])
+def send_message(connection_id):
+    json = request.get_json()
+    if json and 'message' in json:
+        recipient_node_url = Connections.get(connection_id)
+        if recipient_node_url:
+            response = requests.post(f"{recipient_node_url}/message/{connection_id}", json={'message': json['message']})
+            if response.status_code == 200:
+                return "Message sent successfully.", 200
+            else:
+                return "Failed to send message.", 500
+        else:
+            return "Recipient not found.", 404
+    else:
+        return "Invalid message format.", 400
+
+
+@app.route('/message/<connection_id>', methods=['POST'])
+def receive_message(connection_id):
+    json = request.get_json()
+    if json and 'message' in json:
+        messages[connection_id] = json['message']
+        return f"Message for {connection_id} received.", 200
+    else:
+        return "Invalid message format.", 400
+    
+
+@app.get('/<connection_id>/message')
+def get_message(connection_id):
+    if connection_id in messages:
+        return messages[connection_id]
+    else:
+        return "No messages for connection", 404
+
 
 def main(app: Flask) -> int:
     global node_name
