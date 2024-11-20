@@ -54,10 +54,12 @@ def getBlocks() -> str:
 def post_nodes():
     new_node = request.json
     name = new_node['name']
+    # print(new_node[name]['join'])
     if name not in Nodes:
         Nodes[name] = {}
         Nodes[name]['name'] = name
         Nodes[name]['url'] = new_node['url']
+        Nodes[name]['join'] = new_node['join']
     return "\n", 201
 
 @app.get('/nodes')
@@ -72,6 +74,7 @@ def connect(url):
            Nodes[name] = {}
            Nodes[name]['name'] = name
            Nodes[name]['url'] = nodes[name]['url']
+           Nodes[name]['join'] = nodes[name]['join']
            requests.post(nodes[name]['url']+'/nodes', json=Nodes[node_name])
 
 
@@ -140,12 +143,14 @@ def main(app: Flask) -> int:
     Nodes[node_name] = {}
     Nodes[node_name]['name'] = node_name
     Nodes[node_name]['url'] = "http://127.0.0.1:"+node_name
+    Nodes[node_name]['join'] = "init"
 
     if args.init:
         print("Starting node "+node_name+" on port "+node_name)
         app.run(host='127.0.0.1', port=node_name)
     elif args.join:
         print("Starting node "+node_name+" on port "+node_name)
+        Nodes[node_name]['join'] = str(args.join)
         connect('http://127.0.0.1:'+str(args.join))
         app.run(host='127.0.0.1', port=node_name)
     else:

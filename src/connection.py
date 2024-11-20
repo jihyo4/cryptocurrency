@@ -30,7 +30,7 @@ class Connection:
 
         if recipient_node_url:
             url = f"{recipient_node_url}/connection/{target_connection_id}/message"
-            print(url)
+            # print(url)
             data = {'message': message}
             response = requests.post(url, json=data)
             if response.status_code != STATUS_OK:
