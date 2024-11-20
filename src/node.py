@@ -6,49 +6,32 @@ import json
 import sys
 from time import time 
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import requests
 
-
-class Block():
-    def __init__(self, ind: int, prev_hash: str, data: str) -> None:
-        self._index = ind
-        self._prev_hash = prev_hash
-        self._timestamp = time()
-        self._data = data
-        self.block_hash = self.hash()
-
-    def hash(self) -> str:
-        return (hashlib.sha256((str(self._index) + self._prev_hash + str(self._timestamp) + self._data).encode())).hexdigest()
-    
-    def toJson(self) -> str:
-        return json.dumps(self.__dict__, sort_keys = True)
-
-
-class Block_chain():  
-    def __init__(self) -> None:  
-        self.chain = [Block(0, '816534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7', 'GenesisBlock').toJson()]  
-        self.pendingTransactions = []
-  
-    def addBlock(self, block: str) -> None:  
-        #validate
-        self.chain.append(block)  
-
+from miner import Miner
 
 app = Flask(__name__)
-block_chain = Block_chain()
+block_chain = []
 Nodes = {}
 node_name = ''
 messages = {}
 Connections = {}
-
+miner = Miner(block_chain)
 @app.route('/')
 def index() -> str:  
     return "The node is active.\n"
 
-@app.get('/blocks')
+@app.get('/get_blockchain')
 def getBlocks() -> str:  
-    return f"{block_chain.chain}\n"
+    return jsonify(block_chain), 200
+
+@app.route('/add_transaction', methods=['POST'])
+def add_transaction():
+    """HTTP endpoint to add a transaction to the miner."""
+    transaction = request.json
+    miner.add_transaction(transaction)
+    return jsonify({"message": "Transaction added", "transaction": transaction}), 201
 
 @app.post('/nodes')
 def post_nodes():
@@ -130,12 +113,13 @@ def get_message(connection_id):
         return "No messages for connection", 404
 
 
-def main(app: Flask) -> int:
+def main(app: Flask, miner) -> int:
     global node_name
     parser = argparse.ArgumentParser()
     parser.add_argument('--init', help='Initialise the first node.', action='store_true')
     parser.add_argument('--join', help='Create a new node. Please specify the port of the node it should be connected to')
     parser.add_argument('--port', help='Please specify the port number of the node', type=int)
+    parser.add_argument('--miner', help='If used, the created node will also serve as a miner', action='store_true')
     args = parser.parse_args()
 
     node_name = str(args.port)
@@ -147,10 +131,14 @@ def main(app: Flask) -> int:
 
     if args.init:
         print("Starting node "+node_name+" on port "+node_name)
+        if args.miner:
+            miner.start_mining()
         app.run(host='127.0.0.1', port=node_name)
     elif args.join:
         print("Starting node "+node_name+" on port "+node_name)
         Nodes[node_name]['join'] = str(args.join)
+        if args.miner:
+            miner.start_mining()
         connect('http://127.0.0.1:'+str(args.join))
         app.run(host='127.0.0.1', port=node_name)
     else:
@@ -158,4 +146,4 @@ def main(app: Flask) -> int:
     return 0
 
 if __name__ == '__main__':
-    sys.exit(main(app))
+    sys.exit(main(app, miner))
