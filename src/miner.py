@@ -3,14 +3,27 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from utils import broadcast_message
+import requests
 
 class Miner:
+
+    instance_count = 0
+
     def __init__(self, blockchain, nodes):
+        Miner.instance_count += 1
+        print(f"Initializing Miner instance {Miner.instance_count}")
         self.transaction_pool = []
         self.blockchain = blockchain
+        print("initializing miner with blockchain")
         self.difficulty = 5  # Number of leading zeros required in the hash
         self.mining_executor = ThreadPoolExecutor(max_workers=1)
         self.nodes = nodes
+
+        if not self.blockchain:
+            print("generating genesis here")
+            genesis_block = self.create_genesis_block()
+            self.blockchain.append(genesis_block)
+
 
 
     def create_genesis_block(self):
@@ -34,7 +47,7 @@ class Miner:
         """Create a block and mine it."""
         previous_hash = self.blockchain[-1]['hash'] if self.blockchain else '0' * 64
         block = {
-            'index': len(self.blockchain) + 1,
+            'index': len(self.blockchain),
             'timestamp': time.time(),
             'transactions': self.transaction_pool,
             'previous_hash': previous_hash,
@@ -53,8 +66,7 @@ class Miner:
         """Handle the block once mining is complete."""
         new_block = future.result()
         self.blockchain.append(new_block)
-        #print("New Block Mined:", new_block)
-        # TODO: broadcast here 
+        print("New Block Mined:", new_block)
         data = {
             "index": new_block['index'],
             "timestamp": new_block['timestamp'],
@@ -63,6 +75,11 @@ class Miner:
             "nonce": new_block['nonce'],
             "hash": new_block['hash']
         }
+        for node_url in self.nodes.values():
+            try:
+                requests.get(f"{node_url['url']}/get_blockchain")
+            except Exception as e:
+                print(f"Error synchronizing with node {node_url}: {e}")
         broadcast_message('add_block', data, self.nodes)
         self.start_mining()
 

@@ -17,7 +17,7 @@ block_chain = []
 Nodes = {}
 node_name = ''
 messages = {}
-miner = Miner(block_chain, Nodes)
+miner = None
 @app.route('/')
 def index() -> str:  
     return "The node is active.\n"
@@ -28,16 +28,15 @@ def getBlocks() -> str:
 
 @app.route('/add_transaction', methods=['POST'])
 def add_transaction():
+    global miner
     """HTTP endpoint to add a transaction to the miner."""
     transaction = request.json
 
-    # Sprawdź poprawność danych wejściowych
     if not transaction or "sender" not in transaction or "receiver" not in transaction or "amount" not in transaction:
         return jsonify({"error": "Invalid transaction format"}), 400
 
     miner.add_transaction(transaction)
 
-    # Wymuś utworzenie bloku po dodaniu transakcji
     new_block = miner.create_block()
     block_chain.append(new_block)
 
@@ -60,19 +59,28 @@ def get_nodes():
     return Nodes
 
 def connect(url):
-    r = requests.get(url + '/get_blockchain')
-    blockchain = r.json()
-    if not block_chain and blockchain:
-        block_chain.extend(blockchain)  # Synchronizacja blockchainu
-    elif not block_chain:
-        block_chain.append(miner.create_genesis_block())
-    
-    r = requests.get(url + '/nodes')
-    nodes = r.json()
-    for name, info in nodes.items():
-        if name != node_name:
-            Nodes[name] = info
-            requests.post(info['url'] + '/nodes', json=Nodes[node_name])
+    try:
+        r = requests.get(f"{url}/get_blockchain")
+        if r.status_code == 200:
+            blockchain = r.json()
+            if blockchain:  # Jeśli istnieje blockchain w węźle, zsynchronizuj
+                block_chain.clear()
+                block_chain.extend(blockchain)
+                print(f"Blockchain synchronized with node {url}.")
+            else:
+                print(f"Node {url} has no blockchain. Skipping sync.")
+
+        r = requests.get(f"{url}/nodes")
+        nodes = r.json()
+        for name, info in nodes.items():
+            if name != node_name:
+                Nodes[name] = info
+                requests.post(info['url'] + '/nodes', json=Nodes[node_name])
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error synchronizing with {url}: {e}")
+
+
 
 
     
@@ -84,16 +92,14 @@ def get_all_messages():
 
 @app.route('/broadcast_transaction', methods=['POST'])
 def broadcast_transaction():
+    global miner
     transaction = request.json
 
-    # Dodaj transakcję do lokalnej puli
     miner.add_transaction(transaction)
 
-    # Wymuś utworzenie nowego bloku
     new_block = miner.create_block()
     block_chain.append(new_block)
 
-    # Rozsyłaj nowy blok do innych węzłów
     broadcast_message('add_block', new_block, Nodes)
 
     return jsonify({"message": "Transaction broadcasted and block created"}), 200
@@ -117,16 +123,15 @@ def add_block():
 
     # Walidacja bloku
     if validate_block(block):
+        print("Block validated. Adding to chain.")
         block_chain.append(block)
-        print("Block added to chain.")
-
-        # Rozgłoś do innych węzłów
-        broadcast_message('add_block', block, Nodes)
-
         return jsonify({"message": "Block added"}), 200
 
-    print("Block validation failed.")
+    print("Block validation failed. Ignoring block.")
     return jsonify({"error": "Invalid block"}), 400
+
+
+
 
 
 def synchronize_blockchain():
@@ -158,15 +163,17 @@ def validate_block(block):
     return (
         block["previous_hash"] == last_block["hash"]
         and block["index"] == last_block["index"] + 1
-        and block["hash"].startswith("0000")  # Sprawdzenie trudności (opcjonalne)
+        and block["hash"].startswith("00000")  # Trudność
     )
 
 
 
 
 
-def main(app: Flask, miner) -> int:
+
+def main(app: Flask) -> int:
     global node_name
+    global miner
     parser = argparse.ArgumentParser()
     parser.add_argument('--init', help='Initialise the first node.', action='store_true')
     parser.add_argument('--join', help='Create a new node. Please specify the port of the node it should be connected to')
@@ -181,22 +188,33 @@ def main(app: Flask, miner) -> int:
     Nodes[node_name]['url'] = "http://127.0.0.1:"+node_name
     Nodes[node_name]['join'] = "init"
 
-    if args.init and not block_chain:
-        block_chain.append(miner.create_genesis_block())
-        print("Starting node "+node_name+" on port "+node_name)
+    if args.join:
+        print(f"Synchronizing blockchain with node {args.join}...")
+        connect(f"http://127.0.0.1:{args.join}")
+
+    # Inicjalizacja Minera po synchronizacji blockchain
+    print(f"Initializing Miner for node {node_name}...")
+    miner = Miner(block_chain, Nodes)
+
+    if args.init:
+        if not block_chain:  # Tylko jeśli blockchain jest pusty
+            block_chain.append(miner.create_genesis_block())
+            print(f"Node {node_name} initialized with Genesis Block.")
         if args.miner:
             miner.start_mining()
         app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
+        return 0  # Zakończ poprawnie, gdy init zakończy się sukcesem
+
     elif args.join:
-        print("Starting node "+node_name+" on port "+node_name)
-        Nodes[node_name]['join'] = str(args.join)
+        print(f"Node {node_name} joining node {args.join}.")
+        connect(f"http://127.0.0.1:{args.join}")
         if args.miner:
             miner.start_mining()
-        connect('http://127.0.0.1:'+str(args.join))
         app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
+        return 0  # Zakończ poprawnie, gdy join zakończy się sukcesem
     else:
+        print("No valid arguments provided. Exiting.")
         return 1
-    return 0
 
 if __name__ == '__main__':
-    sys.exit(main(app, miner))
+    sys.exit(main(app))
