@@ -2,13 +2,29 @@ import hashlib
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
+from utils import broadcast_message
 
 class Miner:
-    def __init__(self, blockchain):
+    def __init__(self, blockchain, nodes):
         self.transaction_pool = []
         self.blockchain = blockchain
         self.difficulty = 5  # Number of leading zeros required in the hash
         self.mining_executor = ThreadPoolExecutor(max_workers=1)
+        self.nodes = nodes
+
+
+    def create_genesis_block(self):
+        """Creates genesis block"""
+        genesis_block = {
+            "index": 0,
+            "timestamp": time.time(),
+            "transactions": [],
+            "previous_hash": "0" * 64,
+            "nonce": 0,
+        }
+        genesis_block["hash"] = self.mine_block(genesis_block)
+        print("Genesis block created:", genesis_block)
+        return genesis_block
 
     def add_transaction(self, transaction):
         """Add a transaction to the pool."""
@@ -38,6 +54,16 @@ class Miner:
         new_block = future.result()
         self.blockchain.append(new_block)
         #print("New Block Mined:", new_block)
+        # TODO: broadcast here 
+        data = {
+            "index": new_block['index'],
+            "timestamp": new_block['timestamp'],
+            "transactions": new_block['transactions'],
+            "previous_hash": new_block['previous_hash'],
+            "nonce": new_block['nonce'],
+            "hash": new_block['hash']
+        }
+        broadcast_message('add_block', data, self.nodes)
         self.start_mining()
 
     def mine_block(self, block):

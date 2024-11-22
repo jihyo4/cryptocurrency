@@ -10,14 +10,14 @@ from flask import Flask, request, jsonify
 import requests
 
 from miner import Miner
+from utils import broadcast_message
 
 app = Flask(__name__)
 block_chain = []
 Nodes = {}
 node_name = ''
 messages = {}
-Connections = {}
-miner = Miner(block_chain)
+miner = Miner(block_chain, Nodes)
 @app.route('/')
 def index() -> str:  
     return "The node is active.\n"
@@ -30,8 +30,18 @@ def getBlocks() -> str:
 def add_transaction():
     """HTTP endpoint to add a transaction to the miner."""
     transaction = request.json
+
+    # Sprawdź poprawność danych wejściowych
+    if not transaction or "sender" not in transaction or "receiver" not in transaction or "amount" not in transaction:
+        return jsonify({"error": "Invalid transaction format"}), 400
+
     miner.add_transaction(transaction)
-    return jsonify({"message": "Transaction added", "transaction": transaction}), 201
+
+    # Wymuś utworzenie bloku po dodaniu transakcji
+    new_block = miner.create_block()
+    block_chain.append(new_block)
+
+    return jsonify({"message": "Transaction added and block created", "block": new_block}), 201
 
 @app.post('/nodes')
 def post_nodes():
@@ -50,67 +60,109 @@ def get_nodes():
     return Nodes
 
 def connect(url):
-    r = requests.get(url+'/nodes')
-    nodes = r.json()
-    for name in nodes.keys():
-        if name != node_name:
-           Nodes[name] = {}
-           Nodes[name]['name'] = name
-           Nodes[name]['url'] = nodes[name]['url']
-           Nodes[name]['join'] = nodes[name]['join']
-           requests.post(nodes[name]['url']+'/nodes', json=Nodes[node_name])
-
-
-@app.post('/connections')
-def post_connections():
-    new_connection = request.json
-    connection_id = new_connection['connection_id']
-    node_url = new_connection['node_url']
-
-    if connection_id not in Connections:
-        Connections[connection_id] = node_url
-        return f"Connection {connection_id} registered with node {node_url}", 201
-    else:
-        return f"Connection {connection_id} already exists.", 400
-
-@app.get('/connections')
-def get_connections():
-    return Connections
-
-
-@app.route('/connection/<connection_id>/message', methods=['POST'])
-def send_message(connection_id):
-    json = request.get_json()
-    if json and 'message' in json:
-        recipient_node_url = Connections.get(connection_id)
-        if recipient_node_url:
-            response = requests.post(f"{recipient_node_url}/message/{connection_id}", json={'message': json['message']})
-            if response.status_code == 200:
-                return "Message sent successfully.", 200
-            else:
-                return "Failed to send message.", 500
-        else:
-            return "Recipient not found.", 404
-    else:
-        return "Invalid message format.", 400
-
-
-@app.route('/message/<connection_id>', methods=['POST'])
-def receive_message(connection_id):
-    json = request.get_json()
-    if json and 'message' in json:
-        messages[connection_id] = json['message']
-        return f"Message for {connection_id} received.", 200
-    else:
-        return "Invalid message format.", 400
+    r = requests.get(url + '/get_blockchain')
+    blockchain = r.json()
+    if not block_chain and blockchain:
+        block_chain.extend(blockchain)  # Synchronizacja blockchainu
+    elif not block_chain:
+        block_chain.append(miner.create_genesis_block())
     
+    r = requests.get(url + '/nodes')
+    nodes = r.json()
+    for name, info in nodes.items():
+        if name != node_name:
+            Nodes[name] = info
+            requests.post(info['url'] + '/nodes', json=Nodes[node_name])
 
-@app.get('/<connection_id>/message')
-def get_message(connection_id):
-    if connection_id in messages:
-        return messages[connection_id]
-    else:
-        return "No messages for connection", 404
+
+    
+    
+@app.route('/get_messages', methods=['GET'])
+def get_all_messages():
+    """Get all received messages."""
+    return jsonify(messages), 200
+
+@app.route('/broadcast_transaction', methods=['POST'])
+def broadcast_transaction():
+    transaction = request.json
+
+    # Dodaj transakcję do lokalnej puli
+    miner.add_transaction(transaction)
+
+    # Wymuś utworzenie nowego bloku
+    new_block = miner.create_block()
+    block_chain.append(new_block)
+
+    # Rozsyłaj nowy blok do innych węzłów
+    broadcast_message('add_block', new_block, Nodes)
+
+    return jsonify({"message": "Transaction broadcasted and block created"}), 200
+
+
+@app.route('/broadcast_block', methods=['POST'])
+def broadcast_block():
+    block = request.json
+    broadcast_message('add_block', block, Nodes)  
+    return jsonify({"message": "Block broadcasted"}), 200
+
+@app.route('/add_block', methods=['POST'])
+def add_block():
+    block = request.json
+    print(f"Received block: {block}")
+
+    # Synchronizacja blockchaina (opcjonalne)
+    if len(block_chain) < block["index"]:
+        print("Synchronizing blockchain...")
+        synchronize_blockchain()
+
+    # Walidacja bloku
+    if validate_block(block):
+        block_chain.append(block)
+        print("Block added to chain.")
+
+        # Rozgłoś do innych węzłów
+        broadcast_message('add_block', block, Nodes)
+
+        return jsonify({"message": "Block added"}), 200
+
+    print("Block validation failed.")
+    return jsonify({"error": "Invalid block"}), 400
+
+
+def synchronize_blockchain():
+    """Synchronizuje blockchain z innymi węzłami."""
+    for node_name, node_info in Nodes.items():
+        try:
+            response = requests.get(f"{node_info['url']}/get_blockchain")
+            if response.status_code == 200:
+                remote_blockchain = response.json()
+                if len(remote_blockchain) > len(block_chain):
+                    print(f"Blockchain synchronized with {node_name}.")
+                    block_chain.clear()
+                    block_chain.extend(remote_blockchain)
+        except requests.exceptions.RequestException as e:
+            print(f"Error synchronizing with {node_name}: {e}")
+
+
+
+
+def validate_block(block):
+    """Waliduje otrzymany blok."""
+    if not block_chain:
+        # Genesis block
+        return block["previous_hash"] == "0" * 64
+
+    last_block = block_chain[-1]
+
+    # Sprawdź poprawność poprzedniego hash'a, indeksu i hashu bloku
+    return (
+        block["previous_hash"] == last_block["hash"]
+        and block["index"] == last_block["index"] + 1
+        and block["hash"].startswith("0000")  # Sprawdzenie trudności (opcjonalne)
+    )
+
+
+
 
 
 def main(app: Flask, miner) -> int:
@@ -129,18 +181,19 @@ def main(app: Flask, miner) -> int:
     Nodes[node_name]['url'] = "http://127.0.0.1:"+node_name
     Nodes[node_name]['join'] = "init"
 
-    if args.init:
+    if args.init and not block_chain:
+        block_chain.append(miner.create_genesis_block())
         print("Starting node "+node_name+" on port "+node_name)
         if args.miner:
             miner.start_mining()
-        app.run(host='127.0.0.1', port=node_name)
+        app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
     elif args.join:
         print("Starting node "+node_name+" on port "+node_name)
         Nodes[node_name]['join'] = str(args.join)
         if args.miner:
             miner.start_mining()
         connect('http://127.0.0.1:'+str(args.join))
-        app.run(host='127.0.0.1', port=node_name)
+        app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
     else:
         return 1
     return 0
