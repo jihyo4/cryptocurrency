@@ -6,21 +6,15 @@ from utils import broadcast_message
 import requests
 
 class Miner:
-
-    instance_count = 0
-
     def __init__(self, blockchain, nodes):
-        Miner.instance_count += 1
-        print(f"Initializing Miner instance {Miner.instance_count}")
         self.transaction_pool = []
         self.blockchain = blockchain
-        print("initializing miner with blockchain")
-        self.difficulty = 5  # Number of leading zeros required in the hash
+        self.difficulty = 6  # Number of leading zeros required in the hash
         self.mining_executor = ThreadPoolExecutor(max_workers=1)
         self.nodes = nodes
 
         if not self.blockchain:
-            print("generating genesis here")
+            # print("generating genesis here")
             genesis_block = self.create_genesis_block()
             self.blockchain.append(genesis_block)
 
@@ -35,7 +29,8 @@ class Miner:
             "previous_hash": "0" * 64,
             "nonce": 0,
         }
-        genesis_block["hash"] = self.mine_block(genesis_block)
+        # genesis_block["hash"] = self.mine_block(genesis_block)
+        genesis_block["hash"] = self.difficulty * '0' + "ui589a2161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61"[self.difficulty:]
         print("Genesis block created:", genesis_block)
         return genesis_block
 

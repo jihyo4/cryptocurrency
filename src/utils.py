@@ -1,5 +1,6 @@
 import requests
 
+# TODO: Broadcast na nody połączone do peera inita
 def broadcast_message(endpoint, data, nodes, timeout=5):
     """Broadcast a message to all nodes."""
     for idx, (node_name, node_info) in enumerate(nodes.items()):

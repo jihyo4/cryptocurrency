@@ -63,7 +63,7 @@ def connect(url):
         r = requests.get(f"{url}/get_blockchain")
         if r.status_code == 200:
             blockchain = r.json()
-            if blockchain:  # Jeśli istnieje blockchain w węźle, zsynchronizuj
+            if blockchain:  
                 block_chain.clear()
                 block_chain.extend(blockchain)
                 print(f"Blockchain synchronized with node {url}.")
@@ -90,6 +90,7 @@ def get_all_messages():
     """Get all received messages."""
     return jsonify(messages), 200
 
+# Transakcja nie musi być broadcastowana, potencjalnie do wywalenia
 @app.route('/broadcast_transaction', methods=['POST'])
 def broadcast_transaction():
     global miner
@@ -97,10 +98,10 @@ def broadcast_transaction():
 
     miner.add_transaction(transaction)
 
-    new_block = miner.create_block()
-    block_chain.append(new_block)
+    # new_block = miner.create_block()
+    # block_chain.append(new_block)
 
-    broadcast_message('add_block', new_block, Nodes)
+    # broadcast_message('add_block', new_block, Nodes)
 
     return jsonify({"message": "Transaction broadcasted and block created"}), 200
 
@@ -116,12 +117,10 @@ def add_block():
     block = request.json
     print(f"Received block: {block}")
 
-    # Synchronizacja blockchaina (opcjonalne)
     if len(block_chain) < block["index"]:
         print("Synchronizing blockchain...")
         synchronize_blockchain()
 
-    # Walidacja bloku
     if validate_block(block):
         print("Block validated. Adding to chain.")
         block_chain.append(block)
@@ -159,11 +158,10 @@ def validate_block(block):
 
     last_block = block_chain[-1]
 
-    # Sprawdź poprawność poprzedniego hash'a, indeksu i hashu bloku
     return (
         block["previous_hash"] == last_block["hash"]
         and block["index"] == last_block["index"] + 1
-        and block["hash"].startswith("00000")  # Trudność
+        and block["hash"].startswith(miner.difficulty * "0") 
     )
 
 
@@ -192,18 +190,16 @@ def main(app: Flask) -> int:
         print(f"Synchronizing blockchain with node {args.join}...")
         connect(f"http://127.0.0.1:{args.join}")
 
-    # Inicjalizacja Minera po synchronizacji blockchain
-    print(f"Initializing Miner for node {node_name}...")
     miner = Miner(block_chain, Nodes)
 
     if args.init:
-        if not block_chain:  # Tylko jeśli blockchain jest pusty
+        if not block_chain:
             block_chain.append(miner.create_genesis_block())
             print(f"Node {node_name} initialized with Genesis Block.")
         if args.miner:
             miner.start_mining()
         app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
-        return 0  # Zakończ poprawnie, gdy init zakończy się sukcesem
+        return 0 
 
     elif args.join:
         print(f"Node {node_name} joining node {args.join}.")
@@ -211,7 +207,7 @@ def main(app: Flask) -> int:
         if args.miner:
             miner.start_mining()
         app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
-        return 0  # Zakończ poprawnie, gdy join zakończy się sukcesem
+        return 0  
     else:
         print("No valid arguments provided. Exiting.")
         return 1
