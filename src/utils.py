@@ -4,8 +4,8 @@ import requests
 def broadcast_message(endpoint, data, nodes, timeout=5):
     """Broadcast a message to all nodes."""
     for idx, (node_name, node_info) in enumerate(nodes.items()):
-        if idx == 0:
-            continue
+        # if idx == 0:
+        #     continue
         try:
             node_url = node_info['url']
             print(f"Broadcasting to {node_name} at {node_url}/{endpoint}")

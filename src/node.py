@@ -37,10 +37,7 @@ def add_transaction():
 
     miner.add_transaction(transaction)
 
-    new_block = miner.create_block()
-    block_chain.append(new_block)
-
-    return jsonify({"message": "Transaction added and block created", "block": new_block}), 201
+    return jsonify({"message": "Transaction added.", "transaction": transaction}), 201
 
 @app.post('/nodes')
 def post_nodes():
@@ -124,6 +121,8 @@ def add_block():
     if validate_block(block):
         print("Block validated. Adding to chain.")
         block_chain.append(block)
+        if miner.mining:
+            miner.start_mining()
         return jsonify({"message": "Block added"}), 200
 
     print("Block validation failed. Ignoring block.")
@@ -158,11 +157,19 @@ def validate_block(block):
 
     last_block = block_chain[-1]
 
-    return (
+    if not (
         block["previous_hash"] == last_block["hash"]
         and block["index"] == last_block["index"] + 1
         and block["hash"].startswith(miner.difficulty * "0") 
-    )
+    ):
+        print(block["previous_hash"])
+        print(last_block["hash"])
+        print(block["index"])
+        print(last_block["index"] + 1)
+        print(block["hash"])
+        return False
+    return True
+
 
 
 
@@ -186,10 +193,6 @@ def main(app: Flask) -> int:
     Nodes[node_name]['url'] = "http://127.0.0.1:"+node_name
     Nodes[node_name]['join'] = "init"
 
-    if args.join:
-        print(f"Synchronizing blockchain with node {args.join}...")
-        connect(f"http://127.0.0.1:{args.join}")
-
     miner = Miner(block_chain, Nodes)
 
     if args.init:
@@ -197,11 +200,13 @@ def main(app: Flask) -> int:
             block_chain.append(miner.create_genesis_block())
             print(f"Node {node_name} initialized with Genesis Block.")
         if args.miner:
+            miner.mining = True
             miner.start_mining()
         app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
         return 0 
 
     elif args.join:
+        Nodes[node_name]['join'] = str(args.join)
         print(f"Node {node_name} joining node {args.join}.")
         connect(f"http://127.0.0.1:{args.join}")
         if args.miner:

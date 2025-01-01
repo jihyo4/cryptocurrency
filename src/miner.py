@@ -9,9 +9,10 @@ class Miner:
     def __init__(self, blockchain, nodes):
         self.transaction_pool = []
         self.blockchain = blockchain
-        self.difficulty = 6  # Number of leading zeros required in the hash
+        self.difficulty = 7  # Number of leading zeros required in the hash
         self.mining_executor = ThreadPoolExecutor(max_workers=1)
         self.nodes = nodes
+        self.mining = False
 
         if not self.blockchain:
             # print("generating genesis here")
@@ -30,7 +31,7 @@ class Miner:
             "nonce": 0,
         }
         # genesis_block["hash"] = self.mine_block(genesis_block)
-        genesis_block["hash"] = self.difficulty * '0' + "ui589a2161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61"[self.difficulty:]
+        genesis_block["hash"] = self.difficulty * '0' + "ab589a2161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61"[self.difficulty:]
         print("Genesis block created:", genesis_block)
         return genesis_block
 
@@ -60,7 +61,7 @@ class Miner:
     def block_mined_callback(self, future):
         """Handle the block once mining is complete."""
         new_block = future.result()
-        self.blockchain.append(new_block)
+        #self.blockchain.append(new_block)
         print("New Block Mined:", new_block)
         data = {
             "index": new_block['index'],
@@ -76,7 +77,7 @@ class Miner:
             except Exception as e:
                 print(f"Error synchronizing with node {node_url}: {e}")
         broadcast_message('add_block', data, self.nodes)
-        self.start_mining()
+        #self.start_mining()
 
     def mine_block(self, block):
         """Perform proof-of-work to find a valid hash."""
