@@ -1,32 +1,43 @@
 import hashlib
 import json
+import requests
 import time
 from concurrent.futures import ThreadPoolExecutor
+from Crypto.PublicKey import ECC
 from utils import broadcast_message
-import requests
+
+from wallet import get_pub_address, KEYS
+
+REWARD = 50
 
 class Miner:
-    def __init__(self, blockchain, nodes):
+    def __init__(self, blockchain, nodes, owner):
         self.transaction_pool = []
         self.blockchain = blockchain
-        self.difficulty = 7  # Number of leading zeros required in the hash
+        self.difficulty = 6  # Number of leading zeros required in the hash
         self.mining_executor = ThreadPoolExecutor(max_workers=1)
         self.nodes = nodes
         self.mining = False
+        self.address = None
+        if owner: self.change_owner(owner)
 
         if not self.blockchain:
             # print("generating genesis here")
             genesis_block = self.create_genesis_block()
             self.blockchain.append(genesis_block)
 
-
+    def change_owner(self, owner):
+        """Assign owner of the miner"""
+        with open(f"{KEYS}{owner}_pub.pem", "rb") as file:
+            data = file.read()
+            self.address = get_pub_address(ECC.import_key(data).export_key(format='raw'))
 
     def create_genesis_block(self):
         """Creates genesis block"""
         genesis_block = {
             "index": 0,
             "timestamp": time.time(),
-            "transactions": [],
+            "transactions": serialise_transaction("Coinbase", self.address, REWARD),
             "previous_hash": "0" * 64,
             "nonce": 0,
         }
@@ -42,6 +53,8 @@ class Miner:
     def create_block(self):
         """Create a block and mine it."""
         previous_hash = self.blockchain[-1]['hash'] if self.blockchain else '0' * 64
+        coinbase_transaction = serialise_transaction("Coinbase", self.address, REWARD)
+        self.transaction_pool.insert(0, coinbase_transaction)
         block = {
             'index': len(self.blockchain),
             'timestamp': time.time(),

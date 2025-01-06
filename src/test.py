@@ -15,7 +15,7 @@ def start_node(command):
 def main():
     # Commands to run nodes
     commands = [
-        "./node.py --init --port 3001 --miner",  # Miner node
+        "./node.py --init --port 3001 --miner angel",  # Miner node
         "./node.py --join 3001 --port 3002",    # Join node 3002 to miner
         "./node.py --join 3001 --port 3003",    # Join node 3003 to miner
         "./node.py --join 3002 --port 3004"     # Join node 3004 to node 3002
@@ -35,7 +35,7 @@ def main():
         i = 1
         while True:
             time.sleep(15)
-            transaction = serialise_transaction("Alice", "Bob", i)
+            transaction = serialise_transaction("User 0", "Bob", i)
             response = requests.post("http://127.0.0.1:3001/add_transaction", json=transaction)
             i += 1
     except KeyboardInterrupt:

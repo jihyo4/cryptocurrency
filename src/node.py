@@ -9,7 +9,7 @@ from time import time
 from flask import Flask, request, jsonify
 import requests
 
-from miner import Miner
+from miner import Miner, deserialise_transaction
 from utils import broadcast_message
 
 app = Flask(__name__)
@@ -156,19 +156,12 @@ def validate_block(block):
         return block["previous_hash"] == "0" * 64
 
     last_block = block_chain[-1]
-
-    if not (
+    return (
         block["previous_hash"] == last_block["hash"]
         and block["index"] == last_block["index"] + 1
-        and block["hash"].startswith(miner.difficulty * "0") 
-    ):
-        print(block["previous_hash"])
-        print(last_block["hash"])
-        print(block["index"])
-        print(last_block["index"] + 1)
-        print(block["hash"])
-        return False
-    return True
+        and block["hash"].startswith(miner.difficulty * "0")
+        and deserialise_transaction(block["transactions"][0])["sender"] == "Coinbase"
+    )
 
 
 
@@ -183,7 +176,7 @@ def main(app: Flask) -> int:
     parser.add_argument('--init', help='Initialise the first node.', action='store_true')
     parser.add_argument('--join', help='Create a new node. Please specify the port of the node it should be connected to')
     parser.add_argument('--port', help='Please specify the port number of the node', type=int)
-    parser.add_argument('--miner', help='If used, the created node will also serve as a miner', action='store_true')
+    parser.add_argument('--miner', help='If used, the created node will also serve as a miner and the user with the given name will be the owner of the miner')
     args = parser.parse_args()
 
     node_name = str(args.port)
@@ -193,9 +186,9 @@ def main(app: Flask) -> int:
     Nodes[node_name]['url'] = "http://127.0.0.1:"+node_name
     Nodes[node_name]['join'] = "init"
 
-    miner = Miner(block_chain, Nodes)
+    miner = Miner(block_chain, Nodes, args.miner)
 
-    if args.init:
+    if args.init:    
         if not block_chain:
             block_chain.append(miner.create_genesis_block())
             print(f"Node {node_name} initialized with Genesis Block.")
@@ -210,6 +203,7 @@ def main(app: Flask) -> int:
         print(f"Node {node_name} joining node {args.join}.")
         connect(f"http://127.0.0.1:{args.join}")
         if args.miner:
+            miner.mining = True
             miner.start_mining()
         app.run(host='127.0.0.1', port=node_name, threaded=True, use_reloader=False)
         return 0  
