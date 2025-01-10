@@ -4,17 +4,20 @@ import requests
 import time
 from concurrent.futures import ThreadPoolExecutor
 from Crypto.PublicKey import ECC
+import base64
 from utils import broadcast_message
 
+from transaction import Transaction, Input
 from wallet import get_pub_address, KEYS
 
-REWARD = 50
+REWARD = 50.0
+DIFFICULTY = 5  # Number of leading zeros required in the hash
 
 class Miner:
     def __init__(self, blockchain, nodes, owner):
         self.transaction_pool = []
         self.blockchain = blockchain
-        self.difficulty = 6  # Number of leading zeros required in the hash
+        self.unspent_inputs = {}    
         self.mining_executor = ThreadPoolExecutor(max_workers=1)
         self.nodes = nodes
         self.mining = False
@@ -25,7 +28,68 @@ class Miner:
             # print("generating genesis here")
             genesis_block = self.create_genesis_block()
             self.blockchain.append(genesis_block)
+        for block in self.blockchain:
+            print(block)
+            self.update_unspent_inputs(block)
 
+    def update_unspent_inputs(self, block):
+        """Remove used inputs and add new ones"""
+        used_inputs = {}
+        added_inputs = {}
+        for transaction in block["transactions"]:
+            tx = Transaction.from_json(transaction)
+            for inp in tx.sender_input:
+                if tx.sender == "Coinbase":
+                    continue
+                input = Input.from_json(inp)
+                if input.address not in used_inputs.keys():
+                    used_inputs[input.address] = []
+                used_inputs[input.address].append(input.to_json())
+            for out in tx.recipients:
+                output = Input.from_json(out)
+                if output.address not in added_inputs.keys():
+                    added_inputs[output.address] = []
+                added_inputs[output.address].append(output.to_json())
+
+        for public_key, spent_inputs in used_inputs.items():
+            if public_key in self.unspent_inputs:
+                self.unspent_inputs[public_key] = [
+                    input_obj for input_obj in self.unspent_inputs[public_key]
+                    if input_obj not in spent_inputs
+                ]
+                if not self.unspent_inputs[public_key]:
+                    del self.unspent_inputs[public_key]
+
+        for public_key, new_inputs in added_inputs.items():
+            if public_key in self.unspent_inputs:
+                self.unspent_inputs[public_key].extend(new_inputs)
+            else:
+                self.unspent_inputs[public_key] = new_inputs
+    
+    def validate_inputs(self, tx):
+        transaction = Transaction.from_json(tx)
+        sender = transaction.sender
+        required_amount = Input.from_json(transaction.recipients[0]).amount
+        selected_inputs = []
+
+        if sender not in self.unspent_inputs:
+            return []
+
+        total = 0
+        for input_obj in self.unspent_inputs[sender]:
+            selected_inputs.append(input_obj)
+            total += Input.from_json(input_obj).amount
+            if total >= required_amount:
+                return [selected_inputs, Input(None, Input.from_json(input_obj).address, total - required_amount).to_json()]
+
+        return []
+
+    def get_balance(self, address):
+        total = 0
+        for input_obj in self.unspent_inputs[address]:
+            total += Input.from_json(input_obj).amount
+        return total
+            
     def change_owner(self, owner):
         """Assign owner of the miner"""
         with open(f"{KEYS}{owner}_pub.pem", "rb") as file:
@@ -34,27 +98,32 @@ class Miner:
 
     def create_genesis_block(self):
         """Creates genesis block"""
+        coinbase_transaction = Transaction("Coinbase", self.address, REWARD)
         genesis_block = {
             "index": 0,
             "timestamp": time.time(),
-            "transactions": serialise_transaction("Coinbase", self.address, REWARD),
+            "transactions": [coinbase_transaction.to_json()],
             "previous_hash": "0" * 64,
             "nonce": 0,
         }
-        # genesis_block["hash"] = self.mine_block(genesis_block)
-        genesis_block["hash"] = self.difficulty * '0' + "ab589a2161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61"[self.difficulty:]
+        genesis_block["hash"] = DIFFICULTY * '0' + "ab589a2161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61"[DIFFICULTY:]
         print("Genesis block created:", genesis_block)
         return genesis_block
 
-    def add_transaction(self, transaction):
+    def add_transaction(self, transaction, pub_key):
         """Add a transaction to the pool."""
-        self.transaction_pool.append(transaction)
+        tx = Transaction.from_json(transaction)
+        key_dict = json.loads(pub_key)
+        print(key_dict)
+        pkey = ECC.import_key(base64.b64decode(key_dict["key"]))
+        if tx.verify_signature(pkey):
+            self.transaction_pool.append(tx.to_json())
 
     def create_block(self):
         """Create a block and mine it."""
         previous_hash = self.blockchain[-1]['hash'] if self.blockchain else '0' * 64
-        coinbase_transaction = serialise_transaction("Coinbase", self.address, REWARD)
-        self.transaction_pool.insert(0, coinbase_transaction)
+        coinbase_transaction = Transaction("Coinbase", self.address, REWARD)
+        self.transaction_pool.insert(0, coinbase_transaction.to_json())
         block = {
             'index': len(self.blockchain),
             'timestamp': time.time(),
@@ -98,7 +167,7 @@ class Miner:
         while True:
             block_str = f"{block['index']}{block['timestamp']}{block['transactions']}{block['previous_hash']}{block['nonce']}"
             block_hash = hashlib.sha256(block_str.encode()).hexdigest()
-            if block_hash.startswith('0' * self.difficulty):
+            if block_hash.startswith('0' * DIFFICULTY):
                 #print(time.time() - time_start)
                 return block_hash
             block['nonce'] += 1

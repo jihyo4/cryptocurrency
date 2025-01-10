@@ -2,14 +2,13 @@
 
 import argparse
 import hashlib  
-import json 
+import json
 import sys
-import time
 
 from flask import Flask, request, jsonify
 import requests
 
-from miner import Miner, deserialise_transaction
+from miner import Miner, deserialise_transaction, DIFFICULTY
 from utils import broadcast_message
 
 app = Flask(__name__)
@@ -31,14 +30,36 @@ def getBlocks() -> str:
 def add_transaction():
     global miner
     """HTTP endpoint to add a transaction to the miner."""
-    transaction = request.json
+    transaction, pub_key = request.json
+    if not transaction or "sender" not in transaction or "recipients" not in transaction:
+        return jsonify({"error": transaction}), 400
+        # return jsonify({"error": "Invalid transaction format"}), 400
 
-    if not transaction or "sender" not in transaction or "receiver" not in transaction or "amount" not in transaction:
-        return jsonify({"error": "Invalid transaction format"}), 400
-
-    miner.add_transaction(transaction)
+    miner.add_transaction(transaction, pub_key)
 
     return jsonify({"message": "Transaction added.", "transaction": transaction}), 201
+
+@app.route('/get_inputs', methods=['POST'])
+def get_inputs():
+    global miner
+    transaction = request.json
+
+    if not transaction or "sender" not in transaction or "recipients" not in transaction:
+        # return jsonify({"error": transaction}), 400
+        return jsonify({"error": "Invalid transaction format"}), 400
+
+    input_list = miner.validate_inputs(transaction)
+    
+    return jsonify({"message": "Returned inputs.", "inputs": input_list[0], "recipients": input_list[1]}), 201
+
+@app.route('/get_balance', methods=['POST'])
+def get_balance():
+    global miner
+    address = request.json
+
+    balance = miner.get_balance(address)
+    
+    return jsonify({"message": "Returned balance.", "balance": balance}), 201
 
 @app.post('/nodes')
 def post_nodes():
@@ -100,11 +121,10 @@ def connect(url):
     except requests.exceptions.RequestException as e:
         print(f"Error synchronizing with {url}: {e}")
 
-
-
-
-
-    
+@app.route('/get_unspent_inputs', methods=['GET'])
+def get_unspent_inputs():
+    """Get all unspent inputs."""
+    return jsonify(miner.unspent_inputs), 200  
     
 @app.route('/get_messages', methods=['GET'])
 def get_all_messages():
@@ -254,7 +274,7 @@ def validate_block(block):
     return (
         block["previous_hash"] == last_block["hash"]
         and block["index"] == last_block["index"] + 1
-        and block["hash"].startswith(miner.difficulty * "0")
+        and block["hash"].startswith(DIFFICULTY * "0")
         and deserialise_transaction(block["transactions"][0])["sender"] == "Coinbase"
     )
 
@@ -269,8 +289,8 @@ def validate_chain(chain):
         return False
 
     
-    genesis_block_hash = miner.difficulty * '0' + "ab589a2161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61"[miner.difficulty:]
-    if genesis_block_hash != genesis_block["hash"] or not genesis_block_hash.startswith("0" * miner.difficulty):
+    genesis_block_hash = DIFFICULTY * '0' + "ab589a2161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61"[DIFFICULTY:]
+    if genesis_block_hash != genesis_block["hash"] or not genesis_block_hash.startswith("0" * DIFFICULTY):
         print("Invalid genesis block: Hash does not match or difficulty not met.")
         return False
 
@@ -284,7 +304,7 @@ def validate_chain(chain):
 
         block_str = f"{current_block['index']}{current_block['timestamp']}{current_block['transactions']}{current_block['previous_hash']}{current_block['nonce']}"
         block_hash = hashlib.sha256(block_str.encode()).hexdigest()
-        if block_hash != current_block["hash"] or not block_hash.startswith("0" * miner.difficulty):
+        if block_hash != current_block["hash"] or not block_hash.startswith("0" * DIFFICULTY):
             print(f"Invalid block at index {i}: Hash does not match or difficulty not met.")
             return False
 
@@ -367,11 +387,9 @@ def main(app: Flask) -> int:
             print(f"Error: File {args.malicious} not found.")
         except json.JSONDecodeError as e:
             print(f"Error loading predefined blocks: {e}")
-            
 
-    miner = Miner(block_chain, Nodes, args.miner)
-
-    if args.init:    
+    if args.init:   
+        miner = Miner(block_chain, Nodes, args.miner) 
         if not block_chain:
             block_chain.append(miner.create_genesis_block())
             print(f"Node {node_name} initialized with Genesis Block.")
@@ -385,6 +403,7 @@ def main(app: Flask) -> int:
         Nodes[node_name]['join'] = str(args.join)
         print(f"Node {node_name} joining node {args.join}.")
         connect(f"http://127.0.0.1:{args.join}")
+        miner = Miner(block_chain, Nodes, args.miner)
         if args.miner:
             miner.mining = True
             miner.start_mining()

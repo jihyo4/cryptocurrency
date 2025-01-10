@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import requests
 import subprocess
 import time
-from miner import Miner, serialise_transaction
 
 def start_node(command):
     """
@@ -21,23 +19,39 @@ def main():
         "./node.py --join 3002 --port 3004"     # Join node 3004 to node 3002
     ]
 
+    cmd = [
+        "./wallet.py",
+        "-t",
+        "--name", "angel",
+        "-p", "Pass12..",
+        "--recipient", "00c96bf380732a3218aba9cd5076c7cdd8d39c8fdc98768802",
+        "-nd", "3001",
+        "-a", "30"
+    ]
+
+    def run_wallet_transaction(cmd):
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print("Command Output:")
+            print(result.stdout)
+        
+        except subprocess.CalledProcessError as e:
+            print("Error:")
+            print(e.stderr)
+    
     # Start nodes
     processes = []
     for i, command in enumerate(commands):
         print(f"Starting node {i + 1}: {command}")
         processes.append(start_node(command))
-        time.sleep(2)  # Delay to ensure each node initializes properly
+        time.sleep(2)
 
     print("All nodes started successfully. Press Ctrl+C to terminate.")
 
     try:
-        # Keep the script running to allow the nodes to operate
-        i = 1
         while True:
-            time.sleep(15)
-            transaction = serialise_transaction("User 0", "Bob", i)
-            response = requests.post("http://127.0.0.1:3001/add_transaction", json=transaction)
-            i += 1
+            time.sleep(10)
+            run_wallet_transaction(cmd)
     except KeyboardInterrupt:
         print("\nShutting down nodes...")
         for process in processes:
