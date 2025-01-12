@@ -183,6 +183,9 @@ def sync_blockchain():
     data = request.json
     remote_blockchain = data.get("blockchain", [])
 
+    if remote_blockchain == block_chain:
+        return jsonify({"message": "Blockchain synchronization complete."}), 200
+
     if len(remote_blockchain) >= len(block_chain):
         print(f"Received a blockchain from another node. Length: {len(remote_blockchain)}")
         if validate_chain(remote_blockchain):

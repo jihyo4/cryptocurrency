@@ -5,7 +5,7 @@
         "nonce": 0,
         "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
         "timestamp": 1736516769.5330167,
-        "transactions": "{\"sender\": \"Coinbase\", \"receiver\": \"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\", \"amount\": 50}"
+        "transactions": ["{\"transaction_id\": \"b1422ef30ffdc5ea4f4147324ebb82e6d49cf8baf318c052423bba095e5f1e6a8749e6f77e5bacd283580a87fbdd06baabc160e083182e4a893e752e8f63c67f\", \"timestamp\": 1736678223.084652, \"sender\": \"Coinbase\", \"sender_inputs\": [], \"signature\": null, \"recipients\": [\"{\\\"id\\\": \\\"00000000000000000000000000000000000000000000000000\\\", \\\"address\\\": \\\"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\\\", \\\"amount\\\": 50.0}\"]}"]
     },
     {
         "hash": "000000a6a13b4de0f2b7f7f5f8e37e2f5e8660da44694338631f9f946ffa03b5",
@@ -13,7 +13,7 @@
         "nonce": 732726,
         "previous_hash": "0000002161962fc11a616b271098b4fee6653dbed584d7ced30c76efe4c7bd61",
         "timestamp": 1736516769.5340095,
-        "transactions": ["{\"sender\": \"Coinbase\", \"receiver\": \"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\", \"amount\": 50}"]
+        "transactions": ["{\"transaction_id\": \"b1422ef30ffdc5ea4f4147324ebb82e6d49cf8baf318c052423bba095e5f1e6a8749e6f77e5bacd283580a87fbdd06baabc160e083182e4a893e752e8f63c67f\", \"timestamp\": 1736678223.084652, \"sender\": \"Coinbase\", \"sender_inputs\": [], \"signature\": null, \"recipients\": [\"{\\\"id\\\": \\\"00000000000000000000000000000000000000000000000000\\\", \\\"address\\\": \\\"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\\\", \\\"amount\\\": 50.0}\"]}"]
     },
     {
         "hash": "0000006af73ea24e1ef47f00ad64b6044bcf6ccf1a94e168d448555d3bb4f413",
@@ -21,7 +21,7 @@
         "nonce": 6051320,
         "previous_hash": "000000a6a13b4de0f2b7f7f5f8e37e2f5e8660da44694338631f9f946ffa03b5",
         "timestamp": 1736516771.4759269,
-        "transactions": ["{\"sender\": \"Coinbase\", \"receiver\": \"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\", \"amount\": 50}"]
+        "transactions": ["{\"transaction_id\": \"b1422ef30ffdc5ea4f4147324ebb82e6d49cf8baf318c052423bba095e5f1e6a8749e6f77e5bacd283580a87fbdd06baabc160e083182e4a893e752e8f63c67f\", \"timestamp\": 1736678223.084652, \"sender\": \"Coinbase\", \"sender_inputs\": [], \"signature\": null, \"recipients\": [\"{\\\"id\\\": \\\"00000000000000000000000000000000000000000000000000\\\", \\\"address\\\": \\\"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\\\", \\\"amount\\\": 50.0}\"]}"]
     },
     {
         "hash": "000000e17379842006037d70f00feba1582207887402c58db323647f4250539e",
@@ -29,7 +29,7 @@
         "nonce": 2031248,
         "previous_hash": "0000006af73ea24e1ef47f00ad64b6044bcf6ccf1a94e168d448555d3bb4f413",
         "timestamp": 1736516787.93515,
-        "transactions": ["{\"sender\": \"Coinbase\", \"receiver\": \"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\", \"amount\": 50}"]
+        "transactions": ["{\"transaction_id\": \"b1422ef30ffdc5ea4f4147324ebb82e6d49cf8baf318c052423bba095e5f1e6a8749e6f77e5bacd283580a87fbdd06baabc160e083182e4a893e752e8f63c67f\", \"timestamp\": 1736678223.084652, \"sender\": \"Coinbase\", \"sender_inputs\": [], \"signature\": null, \"recipients\": [\"{\\\"id\\\": \\\"00000000000000000000000000000000000000000000000000\\\", \\\"address\\\": \\\"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\\\", \\\"amount\\\": 50.0}\"]}"]
     },
     {
         "hash": "000000b3410d1993f751a1dc79e33a293928e57e042f6d2d3f09fd27f5cda0c0",
@@ -37,7 +37,7 @@
         "nonce": 7860974,
         "previous_hash": "000000e17379842006037d70f00feba1582207887402c58db323647f4250539e",
         "timestamp": 1736516793.74803,
-        "transactions": ["{\"sender\": \"Coinbase\", \"receiver\": \"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\", \"amount\": 50}"]
+        "transactions": ["{\"transaction_id\": \"b1422ef30ffdc5ea4f4147324ebb82e6d49cf8baf318c052423bba095e5f1e6a8749e6f77e5bacd283580a87fbdd06baabc160e083182e4a893e752e8f63c67f\", \"timestamp\": 1736678223.084652, \"sender\": \"Coinbase\", \"sender_inputs\": [], \"signature\": null, \"recipients\": [\"{\\\"id\\\": \\\"00000000000000000000000000000000000000000000000000\\\", \\\"address\\\": \\\"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\\\", \\\"amount\\\": 50.0}\"]}"]
     },
     {
         "hash": "000000b6b5ec7625c5f67a94ee8ebcd1f062cac5716e5bbd3f6332573f376aca",
@@ -45,6 +45,6 @@
         "nonce": 15660923,
         "previous_hash": "000000b3410d1993f751a1dc79e33a293928e57e042f6d2d3f09fd27f5cda0c0",
         "timestamp": 1736516818.5006316,
-        "transactions": ["{\"sender\": \"Coinbase\", \"receiver\": \"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\", \"amount\": 50}"]
+        "transactions": ["{\"transaction_id\": \"b1422ef30ffdc5ea4f4147324ebb82e6d49cf8baf318c052423bba095e5f1e6a8749e6f77e5bacd283580a87fbdd06baabc160e083182e4a893e752e8f63c67f\", \"timestamp\": 1736678223.084652, \"sender\": \"Coinbase\", \"sender_inputs\": [], \"signature\": null, \"recipients\": [\"{\\\"id\\\": \\\"00000000000000000000000000000000000000000000000000\\\", \\\"address\\\": \\\"006c44242a187f7f7afc192e330f369812f1550c99fd854a0f\\\", \\\"amount\\\": 50.0}\"]}"]
     }
 ]
