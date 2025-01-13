@@ -77,34 +77,9 @@ def post_nodes():
 def get_nodes():
     return Nodes
 
-def connect(url):
-    try:
-        r = requests.get(f"{url}/get_blockchain")
-        if r.status_code == 200:
-            remote_blockchain = r.json()
-            if remote_blockchain:
-                print(f"Received blockchain from node {url}. Length: {len(remote_blockchain)}")
-                if len(remote_blockchain) > len(block_chain):
-                    if validate_chain(remote_blockchain):
-                        if validate_chain(block_chain):
-                            idx = find_common_index(block_chain, remote_blockchain)
-                            if idx == len(block_chain)-1: 
-                                block_chain.clear()
-                                block_chain.extend(remote_blockchain)
-                            if idx is not None:
-                                orphan_blocks.extend(block_chain[idx:])
-                                block_chain.clear()
-                                block_chain.extend(remote_blockchain)
-                        else:
-                            print(f"You are trying to synchronize an invalid blockchain")
-                        print(f"Blockchain synchronized with longer chain from node {url}.")
-                    else:
-                        print(f"Received blockchain from {url} is invalid. Ignoring.")
-                else:
-                    print(f"Current blockchain is longer or equal. No synchronization needed.")
-            else:
-                print(f"Node {url} has no blockchain. Skipping sync.")
 
+def request_and_post_nodes(url):
+    try:
         r = requests.get(f"{url}/nodes")
         if r.status_code == 200:
             nodes = r.json()
@@ -112,11 +87,47 @@ def connect(url):
                 if name != node_name:
                     Nodes[name] = info
                     requests.post(info['url'] + '/nodes', json=Nodes[node_name])
+    except requests.exceptions.RequestException as e:
+        print(f"Could not get nodes from {url}: {e}")
 
-        if len(block_chain) >= len(remote_blockchain):
-            print("Broadcasting longer blockchain to the network.")
-            data = {"blockchain": block_chain}
-            broadcast_message("sync_blockchain", data, Nodes)
+def connect(url):
+    try:
+        r = requests.get(f"{url}/get_blockchain")
+        if r.status_code == 200:
+            remote_blockchain = r.json()
+            if remote_blockchain:
+                print(f"Received blockchain from node {url}. Length: {len(remote_blockchain)}")
+                if validate_chain(remote_blockchain):
+                    if validate_chain(block_chain):
+                        if len(remote_blockchain) > len(block_chain):
+                            idx = find_common_index(block_chain, remote_blockchain)
+                            if idx == len(block_chain)-1: 
+                                block_chain.clear()
+                                block_chain.extend(remote_blockchain)
+                                request_and_post_nodes(url)
+                            if idx is not None:
+                                orphan_blocks.extend(block_chain[idx:])
+                                block_chain.clear()
+                                block_chain.extend(remote_blockchain)
+                                request_and_post_nodes(url)
+                            print(f"Blockchain synchronized with longer chain from node {url}.")
+                        else:
+                            request_and_post_nodes(url)
+                            print("Broadcasting longer blockchain to the network.")
+                            data = {"blockchain": block_chain}
+                            print(f"Nodes: {Nodes}")
+                            broadcast_message("sync_blockchain", data, Nodes)
+                    elif len(block_chain) == 0:
+                        request_and_post_nodes(url)
+                        print("Synchronized the blockchain")
+                        block_chain.clear()
+                        block_chain.extend(remote_blockchain)
+                    else:   
+                        print(f"You are trying to synchronize an invalid blockchain")
+                else:
+                    print(f"Received blockchain from {url} is invalid. Ignoring.")
+            else:
+                print(f"Node {url} has no blockchain. Skipping sync.")
 
     except requests.exceptions.RequestException as e:
         print(f"Error synchronizing with {url}: {e}")
@@ -308,6 +319,9 @@ def validate_chain(chain):
         block_str = f"{current_block['index']}{current_block['timestamp']}{current_block['transactions']}{current_block['previous_hash']}{current_block['nonce']}"
         block_hash = hashlib.sha256(block_str.encode()).hexdigest()
         if block_hash != current_block["hash"] or not block_hash.startswith("0" * DIFFICULTY):
+            print(f"block_str: {block_str}")
+            print(f"hash calculated: {block_hash}")
+            print(f"current_block: {current_block['hash']}")
             print(f"Invalid block at index {i}: Hash does not match or difficulty not met.")
             return False
 
