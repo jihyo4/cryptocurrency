@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import requests
 import time
@@ -20,10 +21,7 @@ class Transaction:
         for input in sender_input:
             self.sender_input.append(input)
         if type(recipients) == str:
-            if sender == 'Coinbase':
-                self.recipients = [Input('00000000000000000000000000000000000000000000000000', recipients, amount).to_json()]
-            else:
-                self.recipients = [Input(None, recipients, amount).to_json()]
+            self.recipients = [Input(recipients, amount).to_json()]
         else:
             self.recipients = recipients
         self.signature = signature
@@ -97,7 +95,7 @@ class Transaction:
     
 
 class Input:
-    def __init__(self,  id, address, amount):
+    def __init__(self, address, amount, id=hashlib.sha1().update(str(time.time()).encode("utf-8"))):
         """
         Input of a transaction.
         """

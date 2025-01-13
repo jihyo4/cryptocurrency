@@ -174,6 +174,7 @@ def add_block():
             print("Block validated. Adding to chain.")
             synchronize_blockchain()
             process_orphan_blocks()
+            miner.update_unspent_inputs(block)
             if miner.mining:
                 miner.start_mining()
             return jsonify({"message": "Block added"}), 200

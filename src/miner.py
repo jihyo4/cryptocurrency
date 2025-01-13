@@ -11,7 +11,7 @@ from transaction import Transaction, Input
 from wallet import get_pub_address, KEYS
 
 REWARD = 50.0
-DIFFICULTY = 5  # Number of leading zeros required in the hash
+DIFFICULTY = 6  # Number of leading zeros required in the hash
 
 class Miner:
     def __init__(self, blockchain, nodes, owner):
@@ -80,14 +80,17 @@ class Miner:
             selected_inputs.append(input_obj)
             total += Input.from_json(input_obj).amount
             if total >= required_amount:
-                return [selected_inputs, Input(None, Input.from_json(input_obj).address, total - required_amount).to_json()]
+                return [selected_inputs, Input(Input.from_json(input_obj).address, total - required_amount).to_json()]
 
         return []
 
     def get_balance(self, address):
-        total = 0
-        for input_obj in self.unspent_inputs[address]:
-            total += Input.from_json(input_obj).amount
+        total = 0.0
+        try:
+            for input_obj in self.unspent_inputs[address]:
+                total += Input.from_json(input_obj).amount
+        except KeyError:
+            total = 0.0
         return total
             
     def change_owner(self, owner):
