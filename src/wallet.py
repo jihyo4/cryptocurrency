@@ -5,6 +5,7 @@ import base64
 import json
 import requests
 import sys
+import time
 
 from Crypto.PublicKey import ECC
 from Crypto.Hash import SHA256, RIPEMD160
@@ -44,13 +45,13 @@ def send_transaction(node, transaction, pub_key):
     except Exception as e:
         print("Error connecting to node:", e)
 
-def create_signed_transaction(sender_name, password, recipient, amount):
+def create_signed_transaction(sender_name, password, recipient, amount, node):
     private_key = import_priv_key(f"{KEYS}{sender_name}_priv.pem", password)
     with open(f"{KEYS}{sender_name}_pub.pem", "rb") as file:
         data = file.read()
         pub_address = get_pub_address(ECC.import_key(data).export_key(format='raw'))
-    tx = Transaction(pub_address, recipient, amount)
-    tx.get_inputs()
+    tx = Transaction(pub_address, recipient, amount, time.time())
+    tx.get_inputs(node)
     if not tx.sender_input:
         print('Not enough funds')
         return None
@@ -113,7 +114,8 @@ def main() -> int:
             args.name,
             args.password,
             args.recipient,
-            args.amount
+            args.amount,
+            args.node
         )
         if not transaction:
             return 1

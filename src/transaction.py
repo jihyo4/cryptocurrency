@@ -1,16 +1,16 @@
 import base64
-import hashlib
 import json
+import random
 import requests
 import time
 
-from Crypto.Hash import SHA512
+from Crypto.Hash import SHA512, SHA256
 from Crypto.Signature import DSS
 
 
 
 class Transaction:
-    def __init__(self, sender, recipients, amount, transaction_id=None, signature=None, sender_input=[], timestamp=time.time()):
+    def __init__(self, sender, recipients, amount, timestamp, transaction_id=None, signature=None, sender_input=[]):
         """
         Initialize a transaction object.
         """
@@ -21,16 +21,16 @@ class Transaction:
         for input in sender_input:
             self.sender_input.append(input)
         if type(recipients) == str:
-            self.recipients = [Input(recipients, amount).to_json()]
+            self.recipients = [Input(recipients, amount, SHA256.new(str(time.time()+random.random()).encode("utf-8")).hexdigest()).to_json()]
         else:
             self.recipients = recipients
         self.signature = signature
         if not self.transaction_id:
             self.compute_hash()
 
-    def get_inputs(self):
+    def get_inputs(self, node):
         transaction = self.to_json()
-        r = requests.post("http://127.0.0.1:3001/get_inputs", json=transaction)
+        r = requests.post(f"http://127.0.0.1:{node}/get_inputs", json=transaction)
         if r.status_code == 201:
             self.sender_input = r.json()["inputs"]
             self.recipients.append(r.json()["recipients"])
@@ -95,7 +95,7 @@ class Transaction:
     
 
 class Input:
-    def __init__(self, address, amount, id=hashlib.sha1().update(str(time.time()).encode("utf-8"))):
+    def __init__(self, address, amount, id):
         """
         Input of a transaction.
         """

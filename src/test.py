@@ -16,7 +16,7 @@ def main():
         "./node.py --init --port 3001 --miner angel",  # Miner node
         "./node.py --join 3001 --port 3002",    # Join node 3002 to miner
         "./node.py --join 3001 --port 3003",    # Join node 3003 to miner
-        "./node.py --join 3002 --port 3004"     # Join node 3004 to node 3002
+        "./node.py --join 3002 --port 3004 --miner devil"     # Join node 3004 to node 3002
     ]
 
     cmd = [

@@ -1,8 +1,10 @@
 import hashlib
 import json
+import random
 import requests
 import time
 from concurrent.futures import ThreadPoolExecutor
+from Crypto.Hash import SHA256
 from Crypto.PublicKey import ECC
 import base64
 from utils import broadcast_message
@@ -11,7 +13,7 @@ from transaction import Transaction, Input
 from wallet import get_pub_address, KEYS
 
 REWARD = 50.0
-DIFFICULTY = 6  # Number of leading zeros required in the hash
+DIFFICULTY = 5  # Number of leading zeros required in the hash
 
 class Miner:
     def __init__(self, blockchain, nodes, owner):
@@ -80,7 +82,7 @@ class Miner:
             selected_inputs.append(input_obj)
             total += Input.from_json(input_obj).amount
             if total >= required_amount:
-                return [selected_inputs, Input(Input.from_json(input_obj).address, total - required_amount).to_json()]
+                return [selected_inputs, Input(Input.from_json(input_obj).address, total - required_amount, SHA256.new(str(time.time()+random.random()).encode("utf-8")).hexdigest()).to_json()]
 
         return []
 
@@ -101,10 +103,11 @@ class Miner:
 
     def create_genesis_block(self):
         """Creates genesis block"""
-        coinbase_transaction = Transaction("Coinbase", self.address, REWARD)
+        timestamp = time.time()
+        coinbase_transaction = Transaction("Coinbase", self.address, REWARD, timestamp)
         genesis_block = {
             "index": 0,
-            "timestamp": time.time(),
+            "timestamp": timestamp,
             "transactions": [coinbase_transaction.to_json()],
             "previous_hash": "0" * 64,
             "nonce": 0,
@@ -117,7 +120,6 @@ class Miner:
         """Add a transaction to the pool."""
         tx = Transaction.from_json(transaction)
         key_dict = json.loads(pub_key)
-        print(key_dict)
         pkey = ECC.import_key(base64.b64decode(key_dict["key"]))
         if tx.verify_signature(pkey):
             self.transaction_pool.append(tx.to_json())
@@ -125,11 +127,12 @@ class Miner:
     def create_block(self):
         """Create a block and mine it."""
         previous_hash = self.blockchain[-1]['hash'] if self.blockchain else '0' * 64
-        coinbase_transaction = Transaction("Coinbase", self.address, REWARD)
+        timestamp = time.time()
+        coinbase_transaction = Transaction("Coinbase", self.address, REWARD, timestamp)
         self.transaction_pool.insert(0, coinbase_transaction.to_json())
         block = {
             'index': len(self.blockchain),
-            'timestamp': time.time(),
+            'timestamp': timestamp,
             'transactions': self.transaction_pool,
             'previous_hash': previous_hash,
             'nonce': 0
