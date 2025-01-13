@@ -107,6 +107,7 @@ def connect(url):
                                 request_and_post_nodes(url)
                             if idx is not None:
                                 orphan_blocks.extend(block_chain[idx:])
+                                process_orphaned_transactions(block_chain[idx:], block_chain)
                                 block_chain.clear()
                                 block_chain.extend(remote_blockchain)
                                 request_and_post_nodes(url)
@@ -115,8 +116,8 @@ def connect(url):
                             request_and_post_nodes(url)
                             print("Broadcasting longer blockchain to the network.")
                             data = {"blockchain": block_chain}
-                            print(f"Nodes: {Nodes}")
-                            broadcast_message("sync_blockchain", data, Nodes)
+                            filtered_nodes = {name: node for i, (name, node) in enumerate(Nodes.items()) if i != 0}
+                            broadcast_message("sync_blockchain", data, nodes=filtered_nodes)
                     elif len(block_chain) == 0:
                         request_and_post_nodes(url)
                         print("Synchronized the blockchain")
@@ -180,7 +181,7 @@ def add_block():
             return jsonify({"message": "Block added"}), 200
         else:
             return jsonify({"error": "Invalid block"}), 400
-    
+    synchronize_blockchain()
     print("Block does not match current chain. Storing as orphan.")
     orphan_blocks.append(block)
     return jsonify({"message": "Orphan block stored"}), 202
@@ -210,10 +211,12 @@ def sync_blockchain():
                 block_chain.extend(remote_blockchain)
             elif idx < len(block_chain)-1 and len(remote_blockchain) > len(block_chain):
                 orphan_blocks.extend(block_chain[max(idx,1):])
+                process_orphaned_transactions(block_chain[max(idx,1):], block_chain)
                 block_chain.clear()
                 block_chain.extend(remote_blockchain)
             elif idx < len(block_chain)-1 and len(remote_blockchain) == len(block_chain):
                 orphan_blocks.extend(remote_blockchain[max(idx,1):])
+                process_orphaned_transactions(remote_blockchain[max(idx,1):], block_chain)
             print("Blockchain synchronized with the received chain.")
         else:
             print("Received blockchain is invalid. Ignoring.")
@@ -239,7 +242,9 @@ def synchronize_blockchain():
 
                 if len(remote_blockchain) > len(longest_chain) and validate_chain(remote_blockchain):
                     print(f"Synchronizing with {node_name}. Found a longer chain.")
-                    orphan_blocks.extend(find_orphan_blocks(block_chain, remote_blockchain))
+                    found_orphans = find_orphan_blocks(block_chain, remote_blockchain)
+                    orphan_blocks.extend(found_orphans)
+                    process_orphaned_transactions(found_orphans, block_chain)
                     longest_chain = remote_blockchain
         except requests.exceptions.RequestException as e:
             print(f"Error synchronizing with {node_name}: {e}")
@@ -352,6 +357,21 @@ def find_orphan_blocks(old_chain, new_chain):
         block for block in old_chain if block["hash"] not in new_chain_hashes
     ]
     return orphaned_blocks
+
+
+def process_orphaned_transactions(orphan_blocks, block_chain):
+    global miner
+
+    existing_transactions = set(
+        tx for block in block_chain for tx in block["transactions"]
+    )
+    
+    for block in orphan_blocks:
+        for transaction in block["transactions"]:
+            if transaction not in existing_transactions:
+                if transaction not in miner.transaction_pool:
+                    miner.transaction_pool.append(transaction)
+                    print(f"Transaction added to pool: {transaction}")
 
 
 
